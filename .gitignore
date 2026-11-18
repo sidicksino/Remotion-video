@@ -19,3 +19,4 @@ same-example/*.mp4
 *.mask.mp4
 
 .DS_Store
+tools/models/

@@ -6,7 +6,8 @@ Usage:
 Writes <input>.captions.json  ([{text, startMs, endMs, timestampMs, confidence}])
 which matches @remotion/captions `Caption[]`, and <input>.srt.
 """
-import argparse, json, pathlib
+import argparse, json, pathlib, subprocess
+import numpy as np
 from faster_whisper import WhisperModel
 
 p = argparse.ArgumentParser()
@@ -17,13 +18,17 @@ a = p.parse_args()
 
 src = pathlib.Path(a.input)
 model = WhisperModel(a.model, device="auto", compute_type="int8")
-segments, info = model.transcribe(str(src), language=a.lang, word_timestamps=True, vad_filter=True)
+# decode with ffmpeg ourselves (avoids PyAV version clashes): 16 kHz mono float32
+pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", str(src), "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
+                     capture_output=True, check=True).stdout
+audio = np.frombuffer(pcm, np.float32)
+segments, info = model.transcribe(audio, language=a.lang, word_timestamps=True, vad_filter=True)
 
 caps, srt = [], []
 for i, seg in enumerate(segments, 1):
     for w in seg.words or []:
         caps.append({
-            "text": w.word if not caps else w.word,  # keeps leading space, as Remotion expects
+            "text": w.word,  # keeps leading space, as Remotion expects
             "startMs": round(w.start * 1000),
             "endMs": round(w.end * 1000),
             "timestampMs": round((w.start + w.end) / 2 * 1000),

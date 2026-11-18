@@ -22,8 +22,17 @@ if src.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
     out.write_bytes(remove(src.read_bytes()))
     sys.exit(print(f"-> {out}"))
 
+import urllib.request
 import mediapipe as mp
-seg = mp.solutions.selfie_segmentation.SelfieSegmentation(model_selection=0)
+from mediapipe.tasks.python import BaseOptions, vision
+
+MODEL = pathlib.Path(__file__).parent / "models" / "selfie_segmenter.tflite"
+if not MODEL.exists():
+    MODEL.parent.mkdir(exist_ok=True)
+    urllib.request.urlretrieve("https://storage.googleapis.com/mediapipe-models/image_segmenter/"
+                               "selfie_segmenter/float16/latest/selfie_segmenter.tflite", MODEL)
+seg = vision.ImageSegmenter.create_from_options(vision.ImageSegmenterOptions(
+    base_options=BaseOptions(model_asset_path=str(MODEL)), output_confidence_masks=True))
 cap = cv2.VideoCapture(str(src))
 fps = cap.get(cv2.CAP_PROP_FPS) or 30
 w, h = int(cap.get(3)), int(cap.get(4))
@@ -36,7 +45,8 @@ while True:
     ok, frame = cap.read()
     if not ok:
         break
-    m = seg.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).segmentation_mask
+    img = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    m = seg.segment(img).confidence_masks[0].numpy_view().squeeze().astype(np.float32)
     m = cv2.GaussianBlur(m, (7, 7), 0)
     if prev is not None:
         m = 0.6 * m + 0.4 * prev  # temporal smoothing to reduce flicker
