@@ -1,0 +1,21 @@
+# deps / envs
+node_modules/
+tools/.venv/
+__pycache__/
+.env
+
+# build + render output
+dist/
+out/
+outputs/*
+!outputs/.gitkeep
+.hyperframes/
+
+# raw media (large, keep local)
+inputs/*
+!inputs/.gitkeep
+same-example/*.mp4
+*.matte.webm
+*.mask.mp4
+
+.DS_Store
